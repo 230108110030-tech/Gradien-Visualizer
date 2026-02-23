@@ -289,7 +289,7 @@ code, .formula-box, .formula-inline {
 .step-name { font-weight: 700; font-size: 0.95rem; color: #1E293B; }
 .step-content { padding: 12px 16px 14px; }
 .formula-box {
-    display: inline-block;
+    display: block;
     background: #EEF2FF;
     color: #4338CA;
     border-radius: 8px;
@@ -299,6 +299,8 @@ code, .formula-box, .formula-inline {
     font-weight: 600;
     margin: 6px 0;
     border: 1px solid #C7D2FE;
+    white-space: nowrap;
+    overflow-x: auto;
 }
 .step-note { color: #94A3B8; font-style: italic; font-size: 0.83rem; margin: 4px 0 2px 4px; }
 .step-text { color: #475569; font-size: 0.92rem; margin: 5px 0; line-height: 1.6; }
@@ -567,10 +569,10 @@ def build_steps_html(x1, y1, x2, y2):
             elif ltype == "bullet":
                 content_html += f'<p style="color:#475569;font-size:0.92rem;margin:5px 0 5px 8px;line-height:1.6;">— {text}</p>'
             elif ltype == "formula":
-                content_html += f'''<div style="display:inline-block;background:#EEF2FF;color:#4338CA;
+                content_html += f'''<div style="display:block;background:#EEF2FF;color:#4338CA;
                     border:1px solid #C7D2FE;border-radius:8px;padding:9px 16px;
                     font-family:monospace;font-size:1rem;font-weight:600;
-                    margin:5px 0 5px 0;">{text}</div><br>'''
+                    margin:5px 0;white-space:nowrap;overflow-x:auto;">{text}</div>'''
             elif ltype == "note":
                 content_html += f'<p style="color:#94A3B8;font-style:italic;font-size:0.83rem;margin:3px 0;">{text}</p>'
 
@@ -746,7 +748,7 @@ def show_langkah_dialog():
             elif ltype == "bullet":
                 content += f'<p style="color:#475569;font-size:0.92rem;margin:5px 0 5px 8px;line-height:1.6;">— {text}</p>'
             elif ltype == "formula":
-                content += f'<div style="display:inline-block;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;border-radius:8px;padding:9px 16px;font-family:monospace;font-size:1rem;font-weight:600;margin:5px 0;">{text}</div><br>'
+                content += f'<div style="display:block;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;border-radius:8px;padding:9px 16px;font-family:monospace;font-size:1rem;font-weight:600;margin:5px 0;white-space:nowrap;overflow-x:auto;">{text}</div>'
             elif ltype == "note":
                 content += f'<p style="color:#94A3B8;font-style:italic;font-size:0.83rem;margin:3px 0;">{text}</p>'
 
@@ -778,6 +780,18 @@ def show_langkah_dialog():
     <div style="height:12px"></div>
     """, unsafe_allow_html=True)
 
+    # Grafik di dalam dialog
+    dx = x2 - x1
+    if dx != 0:
+        m_val = (y2 - y1) / dx
+        gcolor = "#059669" if m_val > 0 else ("#DC2626" if m_val < 0 else "#4338CA")
+    else:
+        gcolor = "#94A3B8"
+    st.markdown('<div style="font-size:0.72rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6366F1;margin-bottom:6px;">VISUALISASI GRAFIK</div>', unsafe_allow_html=True)
+    fig_modal = make_graph(x1, y1, x2, y2, gcolor, "Visualisasi Garis Lurus")
+    st.pyplot(fig_modal, use_container_width=True)
+    plt.close(fig_modal)
+
     # Tombol tutup (menutup dialog secara native)
     if st.button("✕  Tutup", use_container_width=True, key="dialog_tutup"):
         st.session_state.show_modal = False
@@ -805,7 +819,8 @@ def show_langkah_dialog():
 for k, v in {
     "mode": "visualizer", "calc_result": None, "show_modal": False,
     "drill_score": 0, "drill_total": 0, "drill_coords": None,
-    "drill_feedback": None, "drill_answered": False
+    "drill_feedback": None, "drill_answered": False,
+    "reset_key": 0
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -872,8 +887,8 @@ if st.session_state.mode == "visualizer":
         st.markdown('<span class="titik-badge" style="background:linear-gradient(135deg,#DC2626,#EF4444);">Titik 1</span>',
                     unsafe_allow_html=True)
         a1, b1 = st.columns(2)
-        with a1: x1_str = st.text_input("x₁", value="", placeholder="Ketik angka...", key="vi_x1")
-        with b1: y1_str = st.text_input("y₁", value="", placeholder="Ketik angka...", key="vi_y1")
+        with a1: x1_str = st.text_input("x₁", value="", placeholder="Ketik angka...", key=f"vi_x1_{st.session_state.reset_key}")
+        with b1: y1_str = st.text_input("y₁", value="", placeholder="Ketik angka...", key=f"vi_y1_{st.session_state.reset_key}")
 
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
@@ -881,8 +896,8 @@ if st.session_state.mode == "visualizer":
         st.markdown('<span class="titik-badge" style="background:linear-gradient(135deg,#4338CA,#6366F1);">Titik 2</span>',
                     unsafe_allow_html=True)
         a2, b2 = st.columns(2)
-        with a2: x2_str = st.text_input("x₂", value="", placeholder="Ketik angka...", key="vi_x2")
-        with b2: y2_str = st.text_input("y₂", value="", placeholder="Ketik angka...", key="vi_y2")
+        with a2: x2_str = st.text_input("x₂", value="", placeholder="Ketik angka...", key=f"vi_x2_{st.session_state.reset_key}")
+        with b2: y2_str = st.text_input("y₂", value="", placeholder="Ketik angka...", key=f"vi_y2_{st.session_state.reset_key}")
 
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
@@ -901,6 +916,7 @@ if st.session_state.mode == "visualizer":
         if b_reset:
             st.session_state.calc_result = None
             st.session_state.show_modal  = False
+            st.session_state.reset_key  += 1
             st.rerun()
 
         def do_calc():
@@ -934,6 +950,7 @@ if st.session_state.mode == "visualizer":
 
         # Result card
         r = st.session_state.calc_result
+        st.markdown('<div id="hasil-anchor"></div>', unsafe_allow_html=True)
         if r and "error" in r:
             st.error(r["error"])
         elif r:
@@ -943,6 +960,15 @@ if st.session_state.mode == "visualizer":
                 <div class="result-value" style="color:{r['color']};">m = {r['m_str']}</div>
                 <div class="result-desc">{r['desc']}</div>
             </div>""", unsafe_allow_html=True)
+            # Auto-scroll to result on mobile
+            st.markdown("""
+            <script>
+            (function() {
+                var el = document.getElementById('hasil-anchor');
+                if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+            })();
+            </script>
+            """, unsafe_allow_html=True)
         else:
             st.markdown("""
             <div class="result-card">
