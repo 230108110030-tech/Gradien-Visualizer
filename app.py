@@ -1185,9 +1185,9 @@ elif st.session_state.mode == "review":
     st.markdown("**Gradien Garis Melalui Dua Titik (x₁, y₁) dan (x₂, y₂)**")
     st.markdown("**Rumus:**")
     st.markdown("""
-    <div class="formula-box formula-box-orange">
-        m = (y&#8322; &minus; y&#8321;) / (x&#8322; &minus; x&#8321;)
-        <span style="font-size:0.85em;opacity:0.8;">&nbsp;&nbsp;(syarat: x&#8321; &ne; x&#8322;)</span>
+    <div class="formula-box formula-box-orange" style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap;white-space:normal;">
+        <span style="white-space:nowrap;">m = (y&#8322; &minus; y&#8321;) / (x&#8322; &minus; x&#8321;)</span>
+        <span style="font-size:0.85em;opacity:0.75;white-space:nowrap;">(syarat: x&#8321; &ne; x&#8322;)</span>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("**Catatan Penting:**")
