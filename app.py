@@ -705,6 +705,101 @@ def make_empty_graph(title="Sistem Koordinat Kartesius"):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  DIALOG (TRUE POPUP) — Langkah Penyelesaian
+# ═══════════════════════════════════════════════════════════════
+@st.dialog("Langkah Penyelesaian", width="large")
+def show_langkah_dialog():
+    r = st.session_state.calc_result
+    if not r or "error" in r:
+        st.warning("Belum ada hasil perhitungan.")
+        return
+
+    x1, y1, x2, y2 = r["x1"], r["y1"], r["x2"], r["y2"]
+    x1s, y1s = format_num(x1), format_num(y1)
+    x2s, y2s = format_num(x2), format_num(y2)
+
+    # Soal
+    if x1 == 0 and y1 == 0:
+        soal = f"Tentukan gradien garis yang melalui titik O(0, 0) dan ({x2s}, {y2s})"
+    else:
+        soal = f"Tentukan gradien garis yang melalui titik ({x1s}, {y1s}) dan ({x2s}, {y2s})"
+
+    st.markdown(f"""
+    <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+                color:#6366F1;margin-bottom:5px;">SOAL</div>
+    <div style="background:#F8FAFF;border:1px solid #E0E7FF;border-radius:10px;
+                padding:13px 17px;font-size:0.95rem;color:#334155;font-weight:500;
+                margin-bottom:18px;line-height:1.6;">{soal}</div>
+    """, unsafe_allow_html=True)
+
+    # Langkah-langkah
+    step_colors = ["#0369A1", "#059669", "#D97706", "#7C3AED", "#DB2777"]
+    steps = build_steps(x1, y1, x2, y2)
+
+    for i, step in enumerate(steps):
+        c = step_colors[i % len(step_colors)]
+        # Build content html for this step
+        content = ""
+        for ltype, text in step["lines"]:
+            if ltype == "text":
+                content += f'<p style="color:#475569;font-size:0.92rem;margin:6px 0;line-height:1.6;">{text}</p>'
+            elif ltype == "bullet":
+                content += f'<p style="color:#475569;font-size:0.92rem;margin:5px 0 5px 8px;line-height:1.6;">— {text}</p>'
+            elif ltype == "formula":
+                content += f'<div style="display:inline-block;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;border-radius:8px;padding:9px 16px;font-family:monospace;font-size:1rem;font-weight:600;margin:5px 0;">{text}</div><br>'
+            elif ltype == "note":
+                content += f'<p style="color:#94A3B8;font-style:italic;font-size:0.83rem;margin:3px 0;">{text}</p>'
+
+        st.markdown(f"""
+        <div style="background:#FAFBFF;border:1px solid #E8ECF4;border-radius:12px;
+                    margin-bottom:10px;overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;
+                        background:white;border-bottom:1px solid #F1F5F9;">
+                <span style="padding:3px 12px;border-radius:20px;font-size:0.72rem;
+                             font-weight:700;color:white;background:{c};
+                             letter-spacing:0.5px;white-space:nowrap;">LANGKAH {i+1}</span>
+                <span style="font-weight:700;font-size:0.95rem;color:#1E293B;">{step['title']}</span>
+            </div>
+            <div style="padding:12px 16px 14px;">{content}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Kesimpulan
+    conc = build_conclusion(x1, y1, x2, y2)
+    st.markdown(f"""
+    <div style="background:linear-gradient(135deg,#ECFDF5,#D1FAE5);border:1px solid #6EE7B7;
+                border-radius:14px;padding:18px 22px;margin-top:6px;">
+        <div style="color:#059669;font-size:0.7rem;font-weight:700;letter-spacing:1.5px;
+                    text-transform:uppercase;margin-bottom:4px;">Kesimpulan</div>
+        <div style="font-size:1.2rem;font-weight:800;color:#064E3B;margin:4px 0;
+                    font-family:monospace;">{conc['summary']}</div>
+        <div style="color:#065F46;font-size:0.88rem;font-weight:500;">{conc['desc']}</div>
+    </div>
+    <div style="height:12px"></div>
+    """, unsafe_allow_html=True)
+
+    # Tombol tutup (menutup dialog secara native)
+    if st.button("✕  Tutup", use_container_width=True, key="dialog_tutup"):
+        st.session_state.show_modal = False
+        st.rerun()
+
+    st.markdown("""
+    <style>
+    div[data-testid="stDialog"] button[kind="secondary"] {
+        background: #1E293B !important;
+        color: white !important;
+        font-weight: 700 !important;
+        border-radius: 10px !important;
+        font-size: 0.92rem !important;
+        margin-top: 4px;
+    }
+    div[data-testid="stDialog"] [data-testid="stBaseButton-headerNoPadding"] {
+        color: #94A3B8 !important;
+    }
+    </style>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
 #  SESSION STATE
 # ═══════════════════════════════════════════════════════════════
 for k, v in {
@@ -829,7 +924,7 @@ if st.session_state.mode == "visualizer":
                     "x1":x1,"y1":y1,"x2":x2,"y2":y2,"m_str":m_str,"desc":desc,"color":color}
 
         if b_hitung:
-            do_calc(); st.session_state.show_modal = False; st.rerun()
+            do_calc(); st.rerun()
 
         if b_langkah:
             do_calc()
@@ -867,103 +962,10 @@ if st.session_state.mode == "visualizer":
         st.pyplot(fig, use_container_width=True)
         plt.close(fig)
 
-    # ── POPUP MODAL dengan blur overlay ──────────────────
+    # ── TRUE POPUP dengan @st.dialog ─────────────────────
     if st.session_state.show_modal and st.session_state.calc_result \
             and "error" not in st.session_state.calc_result:
-        r = st.session_state.calc_result
-        steps_html = build_steps_html(r["x1"], r["y1"], r["x2"], r["y2"])
-
-        # Inject full-page modal via components.html — renders real HTML, no escaping
-        modal_full = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{
-    font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
-    background: transparent;
-  }}
-  .overlay {{
-    position: fixed; inset: 0;
-    background: rgba(15,23,42,0.65);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    z-index: 9999;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 32px 16px;
-    overflow-y: auto;
-  }}
-  .modal {{
-    background: white;
-    border-radius: 20px;
-    padding: 28px 32px;
-    width: 100%;
-    max-width: 700px;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.22);
-    animation: slideUp 0.25s ease;
-  }}
-  @keyframes slideUp {{
-    from {{ opacity:0; transform:translateY(20px); }}
-    to   {{ opacity:1; transform:translateY(0); }}
-  }}
-  .modal-header {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid #F1F5F9;
-  }}
-  .modal-title {{
-    font-size: 1.15rem;
-    font-weight: 800;
-    color: #1E293B;
-    letter-spacing: -0.2px;
-  }}
-  .modal-hint {{
-    font-size: 0.75rem;
-    color: #94A3B8;
-  }}
-</style>
-</head>
-<body>
-<div class="overlay">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Langkah Penyelesaian</div>
-      <div class="modal-hint">Gulir ke bawah ↓ lalu klik <strong>Tutup</strong> di halaman</div>
-    </div>
-    {steps_html}
-  </div>
-</div>
-</body>
-</html>
-"""
-        # Hitung tinggi konten langkah agar komponen cukup tinggi
-        n_steps = len(build_steps(r["x1"], r["y1"], r["x2"], r["y2"]))
-        modal_height = min(900, 300 + n_steps * 160)
-        components.html(modal_full, height=modal_height, scrolling=True)
-
-        # Tombol Tutup tetap via Streamlit
-        col_l, col_close, col_r = st.columns([2, 2, 2])
-        with col_close:
-            if st.button("✕  Tutup", key="close_modal", use_container_width=True):
-                st.session_state.show_modal = False
-                st.rerun()
-        st.markdown("""
-        <style>
-        div[data-testid="stHorizontalBlock"]:last-of-type > div:nth-child(2) .stButton > button {
-            background: #1E293B !important;
-            color: white !important;
-            font-weight: 700 !important;
-            border-radius: 10px !important;
-            font-size: 0.95rem !important;
-        }
-        </style>""", unsafe_allow_html=True)
+        show_langkah_dialog()
 
 
 # ═══════════════════════════════════════════════════════════════
