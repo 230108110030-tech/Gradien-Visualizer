@@ -295,12 +295,20 @@ code, .formula-box, .formula-inline {
     border-radius: 8px;
     padding: 9px 16px;
     font-family: 'JetBrains Mono', monospace !important;
-    font-size: 1rem;
+    font-size: clamp(0.78rem, 2.5vw, 1rem);
     font-weight: 600;
     margin: 6px 0;
     border: 1px solid #C7D2FE;
-    white-space: nowrap;
     overflow-x: auto;
+    white-space: pre;
+    word-break: keep-all;
+    -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 600px) {
+    .formula-box {
+        font-size: 0.78rem !important;
+        padding: 8px 12px;
+    }
 }
 .step-note { color: #94A3B8; font-style: italic; font-size: 0.83rem; margin: 4px 0 2px 4px; }
 .step-text { color: #475569; font-size: 0.92rem; margin: 5px 0; line-height: 1.6; }
@@ -571,8 +579,8 @@ def build_steps_html(x1, y1, x2, y2):
             elif ltype == "formula":
                 content_html += f'''<div style="display:block;background:#EEF2FF;color:#4338CA;
                     border:1px solid #C7D2FE;border-radius:8px;padding:9px 16px;
-                    font-family:monospace;font-size:1rem;font-weight:600;
-                    margin:5px 0;white-space:nowrap;overflow-x:auto;">{text}</div>'''
+                    font-family:monospace;font-size:clamp(0.78rem,2.5vw,1rem);font-weight:600;
+                    margin:5px 0;overflow-x:auto;white-space:pre;-webkit-overflow-scrolling:touch;">{text}</div>'''
             elif ltype == "note":
                 content_html += f'<p style="color:#94A3B8;font-style:italic;font-size:0.83rem;margin:3px 0;">{text}</p>'
 
@@ -711,6 +719,19 @@ def make_empty_graph(title="Sistem Koordinat Kartesius"):
 # ═══════════════════════════════════════════════════════════════
 @st.dialog("Langkah Penyelesaian", width="large")
 def show_langkah_dialog():
+    # Paksa dialog scroll ke atas saat dibuka
+    components.html("""
+    <script>
+    (function(){
+        // Scroll dialog container ke atas
+        var dialogs = window.parent.document.querySelectorAll('[data-testid="stDialog"] > div');
+        dialogs.forEach(function(d){ d.scrollTop = 0; });
+        // Juga cari element dengan role=dialog
+        var roleDialogs = window.parent.document.querySelectorAll('[role="dialog"]');
+        roleDialogs.forEach(function(d){ d.scrollTop = 0; });
+    })();
+    </script>
+    """, height=0)
     r = st.session_state.calc_result
     if not r or "error" in r:
         st.warning("Belum ada hasil perhitungan.")
@@ -748,7 +769,7 @@ def show_langkah_dialog():
             elif ltype == "bullet":
                 content += f'<p style="color:#475569;font-size:0.92rem;margin:5px 0 5px 8px;line-height:1.6;">— {text}</p>'
             elif ltype == "formula":
-                content += f'<div style="display:block;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;border-radius:8px;padding:9px 16px;font-family:monospace;font-size:1rem;font-weight:600;margin:5px 0;white-space:nowrap;overflow-x:auto;">{text}</div>'
+                content += f'<div style="display:block;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;border-radius:8px;padding:9px 16px;font-family:monospace;font-size:clamp(0.78rem,2.5vw,1rem);font-weight:600;margin:5px 0;overflow-x:auto;white-space:pre;-webkit-overflow-scrolling:touch;">{text}</div>'
             elif ltype == "note":
                 content += f'<p style="color:#94A3B8;font-style:italic;font-size:0.83rem;margin:3px 0;">{text}</p>'
 
@@ -916,7 +937,14 @@ if st.session_state.mode == "visualizer":
         if b_reset:
             st.session_state.calc_result = None
             st.session_state.show_modal  = False
-            st.session_state.reset_key  += 1
+            # Hapus nilai input secara eksplisit dari session state
+            for _k in [f"vi_x1_{st.session_state.reset_key}",
+                       f"vi_y1_{st.session_state.reset_key}",
+                       f"vi_x2_{st.session_state.reset_key}",
+                       f"vi_y2_{st.session_state.reset_key}"]:
+                if _k in st.session_state:
+                    del st.session_state[_k]
+            st.session_state.reset_key += 1
             st.rerun()
 
         def do_calc():
@@ -960,15 +988,14 @@ if st.session_state.mode == "visualizer":
                 <div class="result-value" style="color:{r['color']};">m = {r['m_str']}</div>
                 <div class="result-desc">{r['desc']}</div>
             </div>""", unsafe_allow_html=True)
-            # Auto-scroll to result on mobile
-            st.markdown("""
+            # Auto-scroll ke hasil menggunakan components.html (script tag yang benar-benar dieksekusi)
+            components.html("""
             <script>
-            (function() {
-                var el = document.getElementById('hasil-anchor');
-                if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-            })();
+            window.parent.document.querySelectorAll('[id="hasil-anchor"]').forEach(function(el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
             </script>
-            """, unsafe_allow_html=True)
+            """, height=0)
         else:
             st.markdown("""
             <div class="result-card">
@@ -1158,17 +1185,9 @@ elif st.session_state.mode == "review":
     st.markdown("**Gradien Garis Melalui Dua Titik (x₁, y₁) dan (x₂, y₂)**")
     st.markdown("**Rumus:**")
     st.markdown("""
-    <div class="formula-box formula-box-orange" style="font-size:1.05rem;line-height:2;">
-        m &nbsp;=&nbsp;
-        <span style="display:inline-block;text-align:center;vertical-align:middle;">
-            <span style="display:block;border-bottom:2px solid #92400E;padding-bottom:3px;">
-                y<sub>2</sub> &minus; y<sub>1</sub>
-            </span>
-            <span style="display:block;padding-top:3px;">
-                x<sub>2</sub> &minus; x<sub>1</sub>
-            </span>
-        </span>
-        &nbsp;&nbsp;&nbsp;(dengan syarat x<sub>1</sub> &ne; x<sub>2</sub>)
+    <div class="formula-box formula-box-orange">
+        m = (y&#8322; &minus; y&#8321;) / (x&#8322; &minus; x&#8321;)
+        <span style="font-size:0.85em;opacity:0.8;">&nbsp;&nbsp;(syarat: x&#8321; &ne; x&#8322;)</span>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("**Catatan Penting:**")
