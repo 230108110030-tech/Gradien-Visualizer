@@ -536,51 +536,55 @@ def build_conclusion(x1, y1, x2, y2):
     else:
         return {"summary": f"m  =  {m_str}", "desc": "Garis HORIZONTAL — gradien bernilai NOL", "color": "#4338CA"}
 
-def render_steps_html(x1, y1, x2, y2):
-    """Return full HTML string for steps modal content."""
+def render_steps_streamlit(x1, y1, x2, y2):
+    """Render steps using native Streamlit widgets — no raw HTML injection."""
     x1s, y1s = format_num(x1), format_num(y1)
     x2s, y2s = format_num(x2), format_num(y2)
+
     if x1 == 0 and y1 == 0:
         soal = f"Tentukan gradien garis yang melalui titik O(0, 0) dan ({x2s}, {y2s})"
     else:
         soal = f"Tentukan gradien garis yang melalui titik ({x1s}, {y1s}) dan ({x2s}, {y2s})"
 
-    step_colors = ["#0369A1", "#059669", "#D97706", "#7C3AED", "#DB2777"]
-    html = f"""
+    st.markdown(f"""
     <div class="modal-soal-label">Soal</div>
     <div class="modal-soal">{soal}</div>
-    """
+    """, unsafe_allow_html=True)
 
-    for i, step in enumerate(build_steps(x1, y1, x2, y2)):
+    step_colors = ["#0369A1", "#059669", "#D97706", "#7C3AED", "#DB2777"]
+    steps = build_steps(x1, y1, x2, y2)
+
+    for i, step in enumerate(steps):
         c = step_colors[i % len(step_colors)]
-        html += f"""
+        st.markdown(f"""
         <div class="step-item">
             <div class="step-head">
                 <span class="step-num" style="background:{c};">LANGKAH {i+1}</span>
                 <span class="step-name">{step['title']}</span>
             </div>
             <div class="step-content">
-        """
+        """, unsafe_allow_html=True)
         for ltype, text in step["lines"]:
             if ltype == "text":
-                html += f'<p class="step-text">{text}</p>'
+                st.markdown(f'<p class="step-text">{text}</p>', unsafe_allow_html=True)
             elif ltype == "bullet":
-                html += f'<p class="step-bullet">– {text}</p>'
+                st.markdown(f'<p class="step-bullet">— {text}</p>', unsafe_allow_html=True)
             elif ltype == "formula":
-                html += f'<div class="formula-box">{text}</div><br>'
+                st.markdown(f'<div class="formula-box">{text}</div>', unsafe_allow_html=True)
+                st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
             elif ltype == "note":
-                html += f'<p class="step-note">{text}</p>'
-        html += "</div></div>"
+                st.markdown(f'<p class="step-note">{text}</p>', unsafe_allow_html=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
     conc = build_conclusion(x1, y1, x2, y2)
-    html += f"""
+    st.markdown(f"""
     <div class="conc-box">
         <div class="conc-eyebrow">Kesimpulan</div>
         <div class="conc-value">{conc['summary']}</div>
         <div class="conc-detail">{conc['desc']}</div>
     </div>
-    """
-    return soal, html
+    <div style="height:20px"></div>
+    """, unsafe_allow_html=True)
 
 def make_graph(x1, y1, x2, y2, color, title):
     fig, ax = plt.subplots(figsize=(7, 6))
@@ -592,14 +596,49 @@ def make_graph(x1, y1, x2, y2, color, title):
     ax.axhline(0, color="#CBD5E1", linewidth=1.0)
     ax.axvline(0, color="#CBD5E1", linewidth=1.0)
     ax.grid(True, linestyle="--", linewidth=0.5, color="#E2E8F0", alpha=0.9)
+
+    # Integer-only ticks
+    import matplotlib.ticker as ticker
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+
     ax.plot([x1, x2], [y1, y2], color=color, linewidth=3, marker="o",
             markersize=10, markeredgecolor="white", markeredgewidth=2.5, zorder=4)
-    off  = max(xr, yr) * 0.07
-    bbox = dict(boxstyle="round,pad=0.35", facecolor="white", edgecolor=color, linewidth=1.5, alpha=0.92)
+
+    bbox_style = dict(boxstyle="round,pad=0.4", facecolor="white",
+                      edgecolor=color, linewidth=1.5, alpha=0.95)
+    off = max(xr, yr) * 0.10
+
+    # Smart offset: avoid overlapping by checking if points are close
+    def smart_offset(px, py, other_x, other_y, base_off):
+        # Choose direction away from the other point and away from (0,0)
+        dx = px - other_x
+        dy = py - other_y
+        # Normalize
+        dist = max((dx**2 + dy**2)**0.5, 0.01)
+        ox = (dx / dist) * base_off
+        oy = (dy / dist) * base_off
+        # Ensure label stays within axes limits
+        nx = px + ox
+        ny = py + oy
+        # Clamp a bit
+        margin = base_off * 0.5
+        nx = max(-xr + margin, min(xr - margin, nx))
+        ny = max(-yr + margin, min(yr - margin, ny))
+        return nx, ny
+
+    tx1, ty1 = smart_offset(x1, y1, x2, y2, off)
+    tx2, ty2 = smart_offset(x2, y2, x1, y1, off)
+
     ax.annotate(f"({format_num(x1)}, {format_num(y1)})", xy=(x1, y1),
-                xytext=(x1+off, y1+off), fontsize=10, fontweight="bold", bbox=bbox, color=color)
+                xytext=(tx1, ty1), fontsize=10, fontweight="bold",
+                bbox=bbox_style, color=color,
+                arrowprops=dict(arrowstyle="-", color=color, lw=1.0, alpha=0.5))
     ax.annotate(f"({format_num(x2)}, {format_num(y2)})", xy=(x2, y2),
-                xytext=(x2+off, y2+off), fontsize=10, fontweight="bold", bbox=bbox, color=color)
+                xytext=(tx2, ty2), fontsize=10, fontweight="bold",
+                bbox=bbox_style, color=color,
+                arrowprops=dict(arrowstyle="-", color=color, lw=1.0, alpha=0.5))
+
     ax.set_xlabel("x", fontsize=12, fontweight="bold", color="#6366F1")
     ax.set_ylabel("y", fontsize=12, fontweight="bold", color="#6366F1")
     ax.set_title(title, fontsize=13, fontweight="bold", color="#1E293B", pad=12)
@@ -697,8 +736,8 @@ if st.session_state.mode == "visualizer":
         st.markdown('<span class="titik-badge" style="background:linear-gradient(135deg,#DC2626,#EF4444);">Titik 1</span>',
                     unsafe_allow_html=True)
         a1, b1 = st.columns(2)
-        with a1: x1_str = st.text_input("x₁", value="", placeholder="mis: 2", key="vi_x1")
-        with b1: y1_str = st.text_input("y₁", value="", placeholder="mis: 6", key="vi_y1")
+        with a1: x1_str = st.text_input("x₁", value="", placeholder="Ketik angka...", key="vi_x1")
+        with b1: y1_str = st.text_input("y₁", value="", placeholder="Ketik angka...", key="vi_y1")
 
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
@@ -706,8 +745,8 @@ if st.session_state.mode == "visualizer":
         st.markdown('<span class="titik-badge" style="background:linear-gradient(135deg,#4338CA,#6366F1);">Titik 2</span>',
                     unsafe_allow_html=True)
         a2, b2 = st.columns(2)
-        with a2: x2_str = st.text_input("x₂", value="", placeholder="mis: 1", key="vi_x2")
-        with b2: y2_str = st.text_input("y₂", value="", placeholder="mis: 3", key="vi_y2")
+        with a2: x2_str = st.text_input("x₂", value="", placeholder="Ketik angka...", key="vi_x2")
+        with b2: y2_str = st.text_input("y₂", value="", placeholder="Ketik angka...", key="vi_y2")
 
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
@@ -791,44 +830,24 @@ if st.session_state.mode == "visualizer":
     if st.session_state.show_modal and st.session_state.calc_result \
             and "error" not in st.session_state.calc_result:
         r = st.session_state.calc_result
-        _, steps_html = render_steps_html(r["x1"], r["y1"], r["x2"], r["y2"])
 
-        st.markdown(f"""
-        <div class="modal-overlay">
-            <div class="modal-box">
-                <div class="modal-header">
-                    <div class="modal-title">Langkah Penyelesaian</div>
-                </div>
-                {steps_html}
-                <div class="modal-close-row">
-                    <div style="font-size:0.8rem;color:#94A3B8;text-align:center;margin-bottom:8px;">
-                        Klik tombol di bawah untuk menutup
-                    </div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("---")
+        # Modal header row
+        hcol1, hcol2 = st.columns([4, 1])
+        with hcol1:
+            st.markdown("""
+            <div style="font-size:1.2rem;font-weight:800;color:#1E293B;
+                        padding:12px 0 4px 0;letter-spacing:-0.2px;">
+                Langkah Penyelesaian
+            </div>""", unsafe_allow_html=True)
+        with hcol2:
+            if st.button("✕  Tutup", key="close_modal", use_container_width=True):
+                st.session_state.show_modal = False
+                st.rerun()
 
-        if st.button("Tutup", key="close_modal", use_container_width=False):
-            st.session_state.show_modal = False
-            st.rerun()
-
-        # Style tutup button
-        st.markdown("""
-        <style>
-        div[data-testid="element-container"]:has(button[data-testid="stBaseButton-secondary"][kind="secondary"]) button,
-        div[data-testid="stVerticalBlock"] > div:last-child .stButton > button {
-            background: #1E293B !important;
-            color: white !important;
-            border-radius: 10px !important;
-            padding: 11px 48px !important;
-            font-size: 0.92rem !important;
-            font-weight: 700 !important;
-            min-width: 200px;
-            display: block;
-            margin: 0 auto;
-        }
-        </style>""", unsafe_allow_html=True)
+        st.markdown('<div class="divider-line"></div>', unsafe_allow_html=True)
+        render_steps_streamlit(r["x1"], r["y1"], r["x2"], r["y2"])
+        st.markdown("---")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -992,9 +1011,22 @@ elif st.session_state.mode == "review":
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("**Gradien Garis Melalui Dua Titik (x₁,y₁) dan (x₂,y₂)**")
+    st.markdown("**Gradien Garis Melalui Dua Titik (x₁, y₁) dan (x₂, y₂)**")
     st.markdown("**Rumus:**")
-    st.markdown('<div class="formula-box formula-box-orange">m &nbsp;=&nbsp; (y&sub2; &minus; y&sub1;) / (x&sub2; &minus; x&sub1;) &nbsp;&nbsp;&nbsp;&nbsp;(dengan syarat x&sub1; &ne; x&sub2;)</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="formula-box formula-box-orange" style="font-size:1.05rem;line-height:2;">
+        m &nbsp;=&nbsp;
+        <span style="display:inline-block;text-align:center;vertical-align:middle;">
+            <span style="display:block;border-bottom:2px solid #92400E;padding-bottom:3px;">
+                y<sub>2</sub> &minus; y<sub>1</sub>
+            </span>
+            <span style="display:block;padding-top:3px;">
+                x<sub>2</sub> &minus; x<sub>1</sub>
+            </span>
+        </span>
+        &nbsp;&nbsp;&nbsp;(dengan syarat x<sub>1</sub> &ne; x<sub>2</sub>)
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("**Catatan Penting:**")
     st.markdown("- Jika **x₁ = x₂** (garis vertikal) → gradien **TIDAK TERDEFINISI**")
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
