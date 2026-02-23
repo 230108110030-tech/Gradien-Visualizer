@@ -536,8 +536,8 @@ def build_conclusion(x1, y1, x2, y2):
     else:
         return {"summary": f"m  =  {m_str}", "desc": "Garis HORIZONTAL — gradien bernilai NOL", "color": "#4338CA"}
 
-def render_steps_streamlit(x1, y1, x2, y2):
-    """Render steps using native Streamlit widgets — no raw HTML injection."""
+def build_steps_html(x1, y1, x2, y2):
+    """Build complete HTML string for steps — safe to inject into modal overlay."""
     x1s, y1s = format_num(x1), format_num(y1)
     x2s, y2s = format_num(x2), format_num(y2)
 
@@ -546,45 +546,59 @@ def render_steps_streamlit(x1, y1, x2, y2):
     else:
         soal = f"Tentukan gradien garis yang melalui titik ({x1s}, {y1s}) dan ({x2s}, {y2s})"
 
-    st.markdown(f"""
-    <div class="modal-soal-label">Soal</div>
-    <div class="modal-soal">{soal}</div>
-    """, unsafe_allow_html=True)
-
     step_colors = ["#0369A1", "#059669", "#D97706", "#7C3AED", "#DB2777"]
     steps = build_steps(x1, y1, x2, y2)
 
+    html = f"""
+    <div style="font-size:0.72rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+                color:#6366F1;margin-bottom:6px;">Soal</div>
+    <div style="background:#F8FAFF;border:1px solid #E0E7FF;border-radius:10px;
+                padding:14px 18px;font-size:0.95rem;color:#334155;font-weight:500;
+                margin-bottom:20px;line-height:1.6;">{soal}</div>
+    """
+
     for i, step in enumerate(steps):
         c = step_colors[i % len(step_colors)]
-        st.markdown(f"""
-        <div class="step-item">
-            <div class="step-head">
-                <span class="step-num" style="background:{c};">LANGKAH {i+1}</span>
-                <span class="step-name">{step['title']}</span>
-            </div>
-            <div class="step-content">
-        """, unsafe_allow_html=True)
+        content_html = ""
         for ltype, text in step["lines"]:
             if ltype == "text":
-                st.markdown(f'<p class="step-text">{text}</p>', unsafe_allow_html=True)
+                content_html += f'<p style="color:#475569;font-size:0.92rem;margin:6px 0;line-height:1.6;">{text}</p>'
             elif ltype == "bullet":
-                st.markdown(f'<p class="step-bullet">— {text}</p>', unsafe_allow_html=True)
+                content_html += f'<p style="color:#475569;font-size:0.92rem;margin:5px 0 5px 8px;line-height:1.6;">— {text}</p>'
             elif ltype == "formula":
-                st.markdown(f'<div class="formula-box">{text}</div>', unsafe_allow_html=True)
-                st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+                content_html += f'''<div style="display:inline-block;background:#EEF2FF;color:#4338CA;
+                    border:1px solid #C7D2FE;border-radius:8px;padding:9px 16px;
+                    font-family:monospace;font-size:1rem;font-weight:600;
+                    margin:5px 0 5px 0;">{text}</div><br>'''
             elif ltype == "note":
-                st.markdown(f'<p class="step-note">{text}</p>', unsafe_allow_html=True)
-        st.markdown("</div></div>", unsafe_allow_html=True)
+                content_html += f'<p style="color:#94A3B8;font-style:italic;font-size:0.83rem;margin:3px 0;">{text}</p>'
+
+        html += f"""
+        <div style="background:#FAFBFF;border:1px solid #E8ECF4;border-radius:12px;
+                    margin-bottom:10px;overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;
+                        background:white;border-bottom:1px solid #F1F5F9;">
+                <span style="padding:3px 12px;border-radius:20px;font-size:0.72rem;
+                             font-weight:700;color:white;background:{c};letter-spacing:0.5px;
+                             white-space:nowrap;">LANGKAH {i+1}</span>
+                <span style="font-weight:700;font-size:0.95rem;color:#1E293B;">{step['title']}</span>
+            </div>
+            <div style="padding:12px 16px 14px;">{content_html}</div>
+        </div>
+        """
 
     conc = build_conclusion(x1, y1, x2, y2)
-    st.markdown(f"""
-    <div class="conc-box">
-        <div class="conc-eyebrow">Kesimpulan</div>
-        <div class="conc-value">{conc['summary']}</div>
-        <div class="conc-detail">{conc['desc']}</div>
+    html += f"""
+    <div style="background:linear-gradient(135deg,#ECFDF5,#D1FAE5);border:1px solid #6EE7B7;
+                border-radius:14px;padding:18px 22px;margin-top:14px;">
+        <div style="color:#059669;font-size:0.7rem;font-weight:700;letter-spacing:1.5px;
+                    text-transform:uppercase;margin-bottom:4px;">Kesimpulan</div>
+        <div style="font-size:1.2rem;font-weight:800;color:#064E3B;margin:4px 0;
+                    font-family:monospace;">{conc['summary']}</div>
+        <div style="color:#065F46;font-size:0.88rem;font-weight:500;">{conc['desc']}</div>
     </div>
-    <div style="height:20px"></div>
-    """, unsafe_allow_html=True)
+    """
+    return html
 
 def make_graph(x1, y1, x2, y2, color, title):
     fig, ax = plt.subplots(figsize=(7, 6))
@@ -597,7 +611,6 @@ def make_graph(x1, y1, x2, y2, color, title):
     ax.axvline(0, color="#CBD5E1", linewidth=1.0)
     ax.grid(True, linestyle="--", linewidth=0.5, color="#E2E8F0", alpha=0.9)
 
-    # Integer-only ticks
     import matplotlib.ticker as ticker
     ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
@@ -606,38 +619,57 @@ def make_graph(x1, y1, x2, y2, color, title):
             markersize=10, markeredgecolor="white", markeredgewidth=2.5, zorder=4)
 
     bbox_style = dict(boxstyle="round,pad=0.4", facecolor="white",
-                      edgecolor=color, linewidth=1.5, alpha=0.95)
-    off = max(xr, yr) * 0.10
+                      edgecolor=color, linewidth=1.5, alpha=0.97)
 
-    # Smart offset: avoid overlapping by checking if points are close
-    def smart_offset(px, py, other_x, other_y, base_off):
-        # Choose direction away from the other point and away from (0,0)
-        dx = px - other_x
-        dy = py - other_y
-        # Normalize
-        dist = max((dx**2 + dy**2)**0.5, 0.01)
-        ox = (dx / dist) * base_off
-        oy = (dy / dist) * base_off
-        # Ensure label stays within axes limits
-        nx = px + ox
-        ny = py + oy
-        # Clamp a bit
-        margin = base_off * 0.5
-        nx = max(-xr + margin, min(xr - margin, nx))
-        ny = max(-yr + margin, min(yr - margin, ny))
-        return nx, ny
+    def label_offset(px, py, ox, oy, xrange, yrange):
+        """Return (tx, ty) offset that keeps label inside axes and away from axes lines."""
+        off_x = xrange * 0.12
+        off_y = yrange * 0.12
 
-    tx1, ty1 = smart_offset(x1, y1, x2, y2, off)
-    tx2, ty2 = smart_offset(x2, y2, x1, y1, off)
+        # Prefer placing label away from the other point
+        tx = px + ox * off_x
+        ty = py + oy * off_y
+
+        # Push away from x=0 and y=0 lines if too close
+        margin_x = xrange * 0.08
+        margin_y = yrange * 0.08
+        if abs(px) < margin_x:
+            tx = px + (1 if ox >= 0 else -1) * off_x * 1.5
+        if abs(py) < margin_y:
+            ty = py + (1 if oy >= 0 else -1) * off_y * 1.5
+
+        # Clamp inside axes
+        pad = xrange * 0.15
+        tx = max(-xr + pad, min(xr - pad, tx))
+        ty = max(-yr + pad, min(yr - pad, ty))
+        return tx, ty
+
+    # Direction away from center-of-line for each point
+    mid_x = (x1 + x2) / 2
+    mid_y = (y1 + y2) / 2
+
+    def away_sign(val, mid):
+        diff = val - mid
+        return 1 if diff >= 0 else -1
+
+    sx1, sy1 = away_sign(x1, mid_x), away_sign(y1, mid_y)
+    sx2, sy2 = away_sign(x2, mid_x), away_sign(y2, mid_y)
+
+    # If both on same side, flip one
+    if sx1 == sx2: sx2 = -sx1
+    if sy1 == sy2: sy2 = -sy1
+
+    tx1, ty1 = label_offset(x1, y1, sx1, sy1, xr*2, yr*2)
+    tx2, ty2 = label_offset(x2, y2, sx2, sy2, xr*2, yr*2)
 
     ax.annotate(f"({format_num(x1)}, {format_num(y1)})", xy=(x1, y1),
                 xytext=(tx1, ty1), fontsize=10, fontweight="bold",
-                bbox=bbox_style, color=color,
-                arrowprops=dict(arrowstyle="-", color=color, lw=1.0, alpha=0.5))
+                bbox=bbox_style, color=color, zorder=6,
+                arrowprops=dict(arrowstyle="-", color=color, lw=1.2, alpha=0.6))
     ax.annotate(f"({format_num(x2)}, {format_num(y2)})", xy=(x2, y2),
                 xytext=(tx2, ty2), fontsize=10, fontweight="bold",
-                bbox=bbox_style, color=color,
-                arrowprops=dict(arrowstyle="-", color=color, lw=1.0, alpha=0.5))
+                bbox=bbox_style, color=color, zorder=6,
+                arrowprops=dict(arrowstyle="-", color=color, lw=1.2, alpha=0.6))
 
     ax.set_xlabel("x", fontsize=12, fontweight="bold", color="#6366F1")
     ax.set_ylabel("y", fontsize=12, fontweight="bold", color="#6366F1")
@@ -826,28 +858,51 @@ if st.session_state.mode == "visualizer":
         st.pyplot(fig, use_container_width=True)
         plt.close(fig)
 
-    # ── POPUP MODAL untuk langkah penyelesaian ──────────────
+    # ── POPUP MODAL dengan blur overlay ──────────────────
     if st.session_state.show_modal and st.session_state.calc_result \
             and "error" not in st.session_state.calc_result:
         r = st.session_state.calc_result
+        steps_html = build_steps_html(r["x1"], r["y1"], r["x2"], r["y2"])
 
-        st.markdown("---")
-        # Modal header row
-        hcol1, hcol2 = st.columns([4, 1])
-        with hcol1:
-            st.markdown("""
-            <div style="font-size:1.2rem;font-weight:800;color:#1E293B;
-                        padding:12px 0 4px 0;letter-spacing:-0.2px;">
-                Langkah Penyelesaian
-            </div>""", unsafe_allow_html=True)
-        with hcol2:
-            if st.button("✕  Tutup", key="close_modal", use_container_width=True):
+        st.markdown(f"""
+        <div style="position:fixed;inset:0;background:rgba(15,23,42,0.6);
+                    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+                    z-index:9999;display:flex;align-items:flex-start;
+                    justify-content:center;padding:32px 16px;overflow-y:auto;">
+            <div style="background:white;border-radius:20px;padding:32px 36px;
+                        width:100%;max-width:700px;
+                        box-shadow:0 24px 80px rgba(0,0,0,0.22);position:relative;
+                        animation:slideUp 0.25s ease;">
+                <div style="display:flex;align-items:center;justify-content:space-between;
+                            margin-bottom:20px;padding-bottom:14px;
+                            border-bottom:1px solid #F1F5F9;">
+                    <div style="font-size:1.2rem;font-weight:800;color:#1E293B;
+                                letter-spacing:-0.2px;">Langkah Penyelesaian</div>
+                    <div style="font-size:0.78rem;color:#94A3B8;">
+                        Gulir ke bawah &darr; lalu klik <strong>Tutup</strong>
+                    </div>
+                </div>
+                {steps_html}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Tombol Tutup di bawah modal (tetap ter-render oleh Streamlit)
+        st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+        col_l, col_close, col_r = st.columns([2, 2, 2])
+        with col_close:
+            if st.button("✕  Tutup Langkah", key="close_modal", use_container_width=True):
                 st.session_state.show_modal = False
                 st.rerun()
-
-        st.markdown('<div class="divider-line"></div>', unsafe_allow_html=True)
-        render_steps_streamlit(r["x1"], r["y1"], r["x2"], r["y2"])
-        st.markdown("---")
+        st.markdown("""
+        <style>
+        div[data-testid="stHorizontalBlock"] > div:nth-child(2) .stButton > button {
+            background: #1E293B !important;
+            color: white !important;
+            font-weight: 700 !important;
+            border-radius: 10px !important;
+        }
+        </style>""", unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -881,7 +936,7 @@ elif st.session_state.mode == "drill":
                 Klik <strong>Soal Baru</strong> untuk memulai latihan
             </div>""", unsafe_allow_html=True)
 
-        ans_input = st.text_input("Jawaban (m) =", placeholder="mis: 3  atau  -1/2",
+        ans_input = st.text_input("Jawaban (m) =", placeholder="misalkan: 3  atau  -1/2",
                                    key="drill_ans", disabled=st.session_state.drill_answered)
 
         db1, db2 = st.columns(2)
