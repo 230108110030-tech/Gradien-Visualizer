@@ -8,6 +8,7 @@ Untuk: SMP Negeri 2 Lawang, Kelas VIII-H
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 import numpy as np
 import random
@@ -601,75 +602,78 @@ def build_steps_html(x1, y1, x2, y2):
     return html
 
 def make_graph(x1, y1, x2, y2, color, title):
+    import matplotlib.ticker as ticker
     fig, ax = plt.subplots(figsize=(7, 6))
     fig.patch.set_facecolor("#FAFBFF")
     ax.set_facecolor("#F8F9FC")
+
     xr = max(abs(x1), abs(x2), 5) + 3
     yr = max(abs(y1), abs(y2), 5) + 3
-    ax.set_xlim(-xr, xr); ax.set_ylim(-yr, yr)
+    # Round up to nice integer boundary
+    xr = int(xr) + 1
+    yr = int(yr) + 1
+    ax.set_xlim(-xr, xr)
+    ax.set_ylim(-yr, yr)
+
     ax.axhline(0, color="#CBD5E1", linewidth=1.0)
     ax.axvline(0, color="#CBD5E1", linewidth=1.0)
     ax.grid(True, linestyle="--", linewidth=0.5, color="#E2E8F0", alpha=0.9)
 
-    import matplotlib.ticker as ticker
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    # Integer-only ticks — step 1 or 2 depending on range
+    step = 2 if xr > 8 else 1
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(step))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(step))
+    ax.xaxis.set_minor_locator(ticker.NullLocator())
+    ax.yaxis.set_minor_locator(ticker.NullLocator())
 
     ax.plot([x1, x2], [y1, y2], color=color, linewidth=3, marker="o",
-            markersize=10, markeredgecolor="white", markeredgewidth=2.5, zorder=4)
+            markersize=10, markeredgecolor="white", markeredgewidth=2.5, zorder=5)
 
     bbox_style = dict(boxstyle="round,pad=0.4", facecolor="white",
                       edgecolor=color, linewidth=1.5, alpha=0.97)
 
-    def label_offset(px, py, ox, oy, xrange, yrange):
-        """Return (tx, ty) offset that keeps label inside axes and away from axes lines."""
-        off_x = xrange * 0.12
-        off_y = yrange * 0.12
-
-        # Prefer placing label away from the other point
-        tx = px + ox * off_x
-        ty = py + oy * off_y
-
-        # Push away from x=0 and y=0 lines if too close
-        margin_x = xrange * 0.08
-        margin_y = yrange * 0.08
-        if abs(px) < margin_x:
-            tx = px + (1 if ox >= 0 else -1) * off_x * 1.5
-        if abs(py) < margin_y:
-            ty = py + (1 if oy >= 0 else -1) * off_y * 1.5
-
-        # Clamp inside axes
-        pad = xrange * 0.15
-        tx = max(-xr + pad, min(xr - pad, tx))
-        ty = max(-yr + pad, min(yr - pad, ty))
-        return tx, ty
-
-    # Direction away from center-of-line for each point
+    # Smart label placement: push each label into opposite quadrant from the other point
+    # relative to the midpoint, and avoid the axes lines
     mid_x = (x1 + x2) / 2
     mid_y = (y1 + y2) / 2
+    off_x = xr * 0.22
+    off_y = yr * 0.22
 
-    def away_sign(val, mid):
-        diff = val - mid
-        return 1 if diff >= 0 else -1
+    def get_offset(px, py, other_x, other_y):
+        # Direction away from the other point
+        dx = px - other_x
+        dy = py - other_y
+        dist = max((dx**2 + dy**2)**0.5, 0.001)
+        nx = dx / dist * off_x
+        ny = dy / dist * off_y
 
-    sx1, sy1 = away_sign(x1, mid_x), away_sign(y1, mid_y)
-    sx2, sy2 = away_sign(x2, mid_x), away_sign(y2, mid_y)
+        tx, ty = px + nx, py + ny
 
-    # If both on same side, flip one
-    if sx1 == sx2: sx2 = -sx1
-    if sy1 == sy2: sy2 = -sy1
+        # Push away from axes if too close (avoid being on the line)
+        if abs(tx) < xr * 0.15:
+            tx += xr * 0.20 * (1 if nx >= 0 else -1)
+        if abs(ty) < yr * 0.12:
+            ty += yr * 0.18 * (1 if ny >= 0 else -1)
 
-    tx1, ty1 = label_offset(x1, y1, sx1, sy1, xr*2, yr*2)
-    tx2, ty2 = label_offset(x2, y2, sx2, sy2, xr*2, yr*2)
+        # Clamp inside plot
+        margin_x = xr * 0.18
+        margin_y = yr * 0.18
+        tx = max(-xr + margin_x, min(xr - margin_x, tx))
+        ty = max(-yr + margin_y, min(yr - margin_y, ty))
+        return tx, ty
 
+    tx1, ty1 = get_offset(x1, y1, x2, y2)
+    tx2, ty2 = get_offset(x2, y2, x1, y1)
+
+    # No arrow lines — just place label box directly (no arrowprops)
     ax.annotate(f"({format_num(x1)}, {format_num(y1)})", xy=(x1, y1),
                 xytext=(tx1, ty1), fontsize=10, fontweight="bold",
-                bbox=bbox_style, color=color, zorder=6,
-                arrowprops=dict(arrowstyle="-", color=color, lw=1.2, alpha=0.6))
+                bbox=bbox_style, color=color, zorder=7,
+                arrowprops=None)
     ax.annotate(f"({format_num(x2)}, {format_num(y2)})", xy=(x2, y2),
                 xytext=(tx2, ty2), fontsize=10, fontweight="bold",
-                bbox=bbox_style, color=color, zorder=6,
-                arrowprops=dict(arrowstyle="-", color=color, lw=1.2, alpha=0.6))
+                bbox=bbox_style, color=color, zorder=7,
+                arrowprops=None)
 
     ax.set_xlabel("x", fontsize=12, fontweight="bold", color="#6366F1")
     ax.set_ylabel("y", fontsize=12, fontweight="bold", color="#6366F1")
@@ -679,6 +683,7 @@ def make_graph(x1, y1, x2, y2, color, title):
     return fig
 
 def make_empty_graph(title="Sistem Koordinat Kartesius"):
+    import matplotlib.ticker as ticker
     fig, ax = plt.subplots(figsize=(7, 6))
     fig.patch.set_facecolor("#FAFBFF")
     ax.set_facecolor("#F8F9FC")
@@ -686,6 +691,10 @@ def make_empty_graph(title="Sistem Koordinat Kartesius"):
     ax.axvline(0, color="#CBD5E1", linewidth=1.0)
     ax.grid(True, linestyle="--", linewidth=0.5, color="#E2E8F0", alpha=0.9)
     ax.set_xlim(-10, 10); ax.set_ylim(-10, 10)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
+    ax.xaxis.set_minor_locator(ticker.NullLocator())
+    ax.yaxis.set_minor_locator(ticker.NullLocator())
     ax.set_xlabel("x", fontsize=12, fontweight="bold", color="#6366F1")
     ax.set_ylabel("y", fontsize=12, fontweight="bold", color="#6366F1")
     tc = "#1E293B" if "Koordinat" in title else "#94A3B8"
@@ -864,43 +873,95 @@ if st.session_state.mode == "visualizer":
         r = st.session_state.calc_result
         steps_html = build_steps_html(r["x1"], r["y1"], r["x2"], r["y2"])
 
-        st.markdown(f"""
-        <div style="position:fixed;inset:0;background:rgba(15,23,42,0.6);
-                    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-                    z-index:9999;display:flex;align-items:flex-start;
-                    justify-content:center;padding:32px 16px;overflow-y:auto;">
-            <div style="background:white;border-radius:20px;padding:32px 36px;
-                        width:100%;max-width:700px;
-                        box-shadow:0 24px 80px rgba(0,0,0,0.22);position:relative;
-                        animation:slideUp 0.25s ease;">
-                <div style="display:flex;align-items:center;justify-content:space-between;
-                            margin-bottom:20px;padding-bottom:14px;
-                            border-bottom:1px solid #F1F5F9;">
-                    <div style="font-size:1.2rem;font-weight:800;color:#1E293B;
-                                letter-spacing:-0.2px;">Langkah Penyelesaian</div>
-                    <div style="font-size:0.78rem;color:#94A3B8;">
-                        Gulir ke bawah &darr; lalu klik <strong>Tutup</strong>
-                    </div>
-                </div>
-                {steps_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Inject full-page modal via components.html — renders real HTML, no escaping
+        modal_full = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+    background: transparent;
+  }}
+  .overlay {{
+    position: fixed; inset: 0;
+    background: rgba(15,23,42,0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 9999;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 16px;
+    overflow-y: auto;
+  }}
+  .modal {{
+    background: white;
+    border-radius: 20px;
+    padding: 28px 32px;
+    width: 100%;
+    max-width: 700px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+    animation: slideUp 0.25s ease;
+  }}
+  @keyframes slideUp {{
+    from {{ opacity:0; transform:translateY(20px); }}
+    to   {{ opacity:1; transform:translateY(0); }}
+  }}
+  .modal-header {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #F1F5F9;
+  }}
+  .modal-title {{
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #1E293B;
+    letter-spacing: -0.2px;
+  }}
+  .modal-hint {{
+    font-size: 0.75rem;
+    color: #94A3B8;
+  }}
+</style>
+</head>
+<body>
+<div class="overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Langkah Penyelesaian</div>
+      <div class="modal-hint">Gulir ke bawah ↓ lalu klik <strong>Tutup</strong> di halaman</div>
+    </div>
+    {steps_html}
+  </div>
+</div>
+</body>
+</html>
+"""
+        # Hitung tinggi konten langkah agar komponen cukup tinggi
+        n_steps = len(build_steps(r["x1"], r["y1"], r["x2"], r["y2"]))
+        modal_height = min(900, 300 + n_steps * 160)
+        components.html(modal_full, height=modal_height, scrolling=True)
 
-        # Tombol Tutup di bawah modal (tetap ter-render oleh Streamlit)
-        st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+        # Tombol Tutup tetap via Streamlit
         col_l, col_close, col_r = st.columns([2, 2, 2])
         with col_close:
-            if st.button("✕  Tutup Langkah", key="close_modal", use_container_width=True):
+            if st.button("✕  Tutup", key="close_modal", use_container_width=True):
                 st.session_state.show_modal = False
                 st.rerun()
         st.markdown("""
         <style>
-        div[data-testid="stHorizontalBlock"] > div:nth-child(2) .stButton > button {
+        div[data-testid="stHorizontalBlock"]:last-of-type > div:nth-child(2) .stButton > button {
             background: #1E293B !important;
             color: white !important;
             font-weight: 700 !important;
             border-radius: 10px !important;
+            font-size: 0.95rem !important;
         }
         </style>""", unsafe_allow_html=True)
 
